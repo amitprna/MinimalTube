@@ -1,6 +1,6 @@
 # Video summaries
 
-Add a Gemini key in **Settings → API keys**, then open a public video and tap **Get summary**. The model defaults to `gemini-flash-latest`; you can select an exact compatible model in Settings.
+Add a Gemini key in **Settings → API keys** (or a Vertex AI key and project, see [Key setup](KEYS.md)), then open a public video and tap **Summary**. The model defaults to `gemini-flash-latest`; you can select an exact compatible model in Settings.
 
 MinimalTube sends the public YouTube URL and this exact prompt as one user message:
 

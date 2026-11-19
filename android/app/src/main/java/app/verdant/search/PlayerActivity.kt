@@ -294,8 +294,8 @@ class PlayerActivity : ComponentActivity() {
     }
 
     private fun requestSummary(regenerate: Boolean) {
-        if(AppSettings.key("gemini").isBlank())android.app.AlertDialog.Builder(this).setTitle("Add a Gemini key")
-            .setMessage("Add your Gemini API key in Settings to summarise public YouTube videos.")
+        if(!AppSettings.summaryReady())android.app.AlertDialog.Builder(this).setTitle("Set up summaries")
+            .setMessage(if(AppSettings.summaryService()==SERVICE_VERTEX)"Add your Vertex AI key and Google Cloud project ID in Settings to summarise public YouTube videos." else "Add your Gemini API key in Settings to summarise public YouTube videos.")
             .setPositiveButton("API keys"){_,_->startActivity(Intent(this,SettingsActivity::class.java).putExtra("page","keys"))}.setNegativeButton("Not now",null).show()
         else ViewModelProvider(this)[SummaryViewModel::class.java].generate(videoId,force=regenerate)
     }

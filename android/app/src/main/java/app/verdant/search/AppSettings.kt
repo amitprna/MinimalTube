@@ -20,6 +20,8 @@ class MinimalTubeApplication: Application() {
         Thread({WatchHistory.initialize(this)},"watch-history").start()
     }
 }
+const val SERVICE_GEMINI="gemini"
+const val SERVICE_VERTEX="vertex"
 data class UserKey(val id: String,val name: String,val value: String,val description: String="")
 object AppSettings {
     private var app: Context?=null
@@ -66,6 +68,12 @@ object AppSettings {
         return builder
     }
     fun model()=text("gemini-model","gemini-flash-latest").removePrefix("models/")
+    /** Which service writes summaries: the Gemini API (AI Studio) or Vertex AI (Google Cloud). */
+    fun summaryService()=if(text("summary-service")==SERVICE_VERTEX) SERVICE_VERTEX else SERVICE_GEMINI
+    fun vertexProject()=text("vertex-project").trim()
+    fun vertexModel()=text("vertex-model",DEFAULT_VERTEX_MODEL).trim().removePrefix("models/")
+    /** True when the chosen summary service has what it needs to run. */
+    fun summaryReady()=if(summaryService()==SERVICE_VERTEX) key("vertex").isNotBlank() && validVertexProject(vertexProject()) else key("gemini").isNotBlank()
     /** Backup summary model used when the main one is overloaded; blank turns the backup off. */
     fun fallbackModel()=text("gemini-fallback-model",DEFAULT_FALLBACK_MODEL).trim().removePrefix("models/")
     fun playbackRate()=text("playback-speed","2.0").toDoubleOrNull()?.takeIf {it in defaultPlaybackRates} ?: 2.0

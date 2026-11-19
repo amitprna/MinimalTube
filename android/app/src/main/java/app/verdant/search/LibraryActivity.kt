@@ -139,7 +139,7 @@ private fun LibraryScreen(activity: LibraryActivity) {
         } else if(rec?.loading==true) {
             scope.launch { snackbar.showSnackbar("Generating summary in background…") }
         } else {
-            if(AppSettings.key("gemini").isBlank()) {
+            if(!AppSettings.summaryReady()) {
                 activity.startActivity(Intent(activity, SettingsActivity::class.java).putExtra("page", "keys"))
             } else {
                 requestedSummaries[video.id]=video
@@ -217,6 +217,14 @@ private fun LibraryScreen(activity: LibraryActivity) {
             .putExtra("thumb",video.thumbnailUrl).putExtra("published",video.publishedAt).putExtra("duration",video.duration.orEmpty()).putExtra("views",video.viewCount.orEmpty())
         if(start>=0)intent.putExtra("start",start)
         activity.startActivity(intent)
+    }
+    // Removing a video from Continue watching also stops tracking its history; Undo puts it back.
+    fun forgetWatch(video: Video) {
+        val previous=WatchHistory.forget(activity,video.id)
+        scope.launch {
+            if(snackbar.showSnackbar("Removed from Continue watching. Its history is no longer tracked.","Undo",duration=SnackbarDuration.Short)==SnackbarResult.ActionPerformed)
+                WatchHistory.restore(activity,video.id,previous)
+        }
     }
     fun refreshNow() {
         permitted {
@@ -329,7 +337,7 @@ private fun LibraryScreen(activity: LibraryActivity) {
                 } }
             } else {
                 val videos=filteredVideos
-                if(tab==0 && resumable.isNotEmpty()) item(key="continue-watching",contentType="continue") { ContinueWatchingRow(resumable,{play(it)},{move(it,1)}) }
+                if(tab==0 && resumable.isNotEmpty()) item(key="continue-watching",contentType="continue") { ContinueWatchingRow(resumable,{play(it)},{move(it,1)},{move(it,2)},{forgetWatch(it)}) }
                 if(tab!=0) item { Text(if(tab==2) "Saved on this device in MinimalTube." else "Videos leave the bin 24 hours after you bin them.",fontSize=12.sp,color=Muted,lineHeight=18.sp) }
                 if(videos.isEmpty()) item { EmptyLibrary(if(tab==0) "A feed with intention." else "Nothing here yet.",if(tab==0) "Add channels in Subscriptions. Your feed updates automatically; tap refresh at the top to check now." else "Your saved videos will appear here.") }
                 items(videos,key={it.id},contentType={"video"}) { video -> Column(Modifier.animateItem()) {
@@ -433,18 +441,18 @@ private fun LibraryScreen(activity: LibraryActivity) {
 
 }
 
-@Composable private fun ContinueWatchingRow(resumable: List<Pair<Video,WatchEntry>>, play: (Video)->Unit, later: (Video)->Unit) {
+@Composable private fun ContinueWatchingRow(resumable: List<Pair<Video,WatchEntry>>, play: (Video)->Unit, later: (Video)->Unit, bin: (Video)->Unit, forget: (Video)->Unit) {
     Column {
         Text("Continue watching",fontSize=13.sp,color=Muted)
         LazyRow(Modifier.padding(top=8.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
             items(resumable,key={it.first.id}) {(video,entry)->
                 val title=remember(video.title){android.text.Html.fromHtml(video.title,0).toString()}
-                Column(Modifier.width(168.dp).clip(RoundedCornerShape(14.dp)).clickable(onClickLabel="Continue video") {play(video)}) {
+                Column(Modifier.width(168.dp).animateItem().clip(RoundedCornerShape(14.dp)).clickable(onClickLabel="Continue video") {play(video)}) {
                     Box(Modifier.fillMaxWidth().aspectRatio(16f/9f).clip(RoundedCornerShape(14.dp)).background(Sand)) {
                         AsyncImage(video.thumbnailUrl,null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
-                        Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(40.dp).background(Color.Black.copy(alpha=.6f),CircleShape).clickable(onClickLabel="Save to Watch Later") {later(video)},contentAlignment=Alignment.Center) {
-                            Icon(Icons.Outlined.WatchLater,"Save to Watch Later",Modifier.size(20.dp),tint=Color.White)
-                        }
+                        CornerButton(Icons.Outlined.DeleteOutline,"Move to bin",Modifier.align(Alignment.TopStart)) {bin(video)}
+                        CornerButton(Icons.Outlined.WatchLater,"Save to Watch Later",Modifier.align(Alignment.TopEnd)) {later(video)}
+                        CornerButton(Icons.Outlined.Close,"Remove from Continue watching",Modifier.align(Alignment.BottomStart).padding(bottom=4.dp)) {forget(video)}
                         Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(Color.Black.copy(alpha=.4f))) {
                             Box(Modifier.fillMaxWidth(entry.fraction).fillMaxHeight().background(MaterialTheme.colorScheme.primary))
                         }
@@ -453,6 +461,14 @@ private fun LibraryScreen(activity: LibraryActivity) {
                     if(entry.duration>entry.position)Text(timestampLabel(entry.duration-entry.position)+" left",fontSize=11.sp,color=Muted)
                 }
             }
+        }
+    }
+}
+/** A small round button over a thumbnail, with a 40 dp touch area. */
+@Composable private fun CornerButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, modifier: Modifier, onClick: ()->Unit) {
+    Box(modifier.padding(2.dp).size(40.dp).clip(CircleShape).clickable(onClickLabel=label,onClick=onClick),contentAlignment=Alignment.Center) {
+        Box(Modifier.size(30.dp).background(Color.Black.copy(alpha=.6f),CircleShape),contentAlignment=Alignment.Center) {
+            Icon(icon,label,Modifier.size(18.dp),tint=Color.White)
         }
     }
 }

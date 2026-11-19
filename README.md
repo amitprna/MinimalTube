@@ -25,11 +25,11 @@
 - **Groups:** one tap filters Home, Subscriptions, Watch Later and Bin; long-press a group to reorder.
 - **Per-channel filter:** hide short videos, or set a minimum length.
 - **Watch Later and Bin:** save any video for later from its card or from the player. The Bin empties itself after 24 hours, and binned videos never return to Home. Undo is one tap.
-- **Resume:** after two minutes of watching, a video continues where you stopped, and a Continue watching row appears on Home.
+- **Resume:** after two minutes of watching, a video continues where you stopped, and a Continue watching row appears on Home. Each video there can go to Watch Later, the Bin, or out of your history.
 - **Player:** full screen, playback speed with a saved default, back and forward 10 seconds, and a position bar.
 - **Search** YouTube from inside the app.
 - **Open YouTube links** from other apps, or share a link to MinimalTube.
-- **Video summaries (optional):** add your own Gemini API key to get the key points of a video, with timestamps you can tap. See [Summaries](docs/SUMMARIES.md).
+- **Video summaries (optional):** add your own Gemini API key, or a Vertex AI key to bill a Google Cloud project, to get the key points of a video with timestamps you can tap. See [Summaries](docs/SUMMARIES.md).
 - **Backup and restore** your library to a file.
 - **Light and dark** looks, or follow the phone.
 

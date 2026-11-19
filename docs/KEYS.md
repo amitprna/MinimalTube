@@ -70,5 +70,14 @@ Sources: [API key management](https://docs.cloud.google.com/docs/authentication/
 
 
 
-Only the YouTube key and optional Gemini key are needed. Edit the existing field to replace a key.
+## Vertex AI summaries — optional
+
+Use this instead of the Gemini API if you want summaries billed to a Google Cloud project, for example to use its credits.
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), open a project with billing or credits and enable the **Vertex AI API**.
+2. Open **APIs & Services → Credentials → Create credentials → API key**. Bind it to a service account with the **Vertex AI User** role and restrict it to the Vertex AI API.
+3. In MinimalTube, add it as the **Vertex AI API key**, choose **Summaries → Vertex AI** and enter the project ID.
+4. Vertex AI does not accept the `-latest` model names; the default is `gemini-4-hydrogen`. If a Gemini API key is also set, the backup model runs there when the Vertex model is busy.
+
+Only the YouTube key is required; Gemini and Vertex AI keys are optional. Edit the existing field to replace a key.
 

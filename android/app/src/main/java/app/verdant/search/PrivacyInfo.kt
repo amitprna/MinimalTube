@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.sp
         Text("Searches and channel requests go to Google using your YouTube API key. The official YouTube player may store cookies and show ads.",fontSize=14.sp)
         Text("Subscriptions, groups, saved videos and watch positions stay on your device. API keys are encrypted and excluded from backups. No analytics or saved search history are collected.",fontSize=14.sp)
         Text("Optional Google sign-in imports and manages subscriptions. It does not sign the player into YouTube or verify Premium. MinimalTube never asks for your password.",fontSize=14.sp)
-        Text("Get summary sends the public video URL and an insights prompt to Gemini using your optional Gemini key. AI insights can be inaccurate.",fontSize=14.sp)
+        Text("Get summary sends the public video URL and an insights prompt to Gemini, through the Gemini API or Vertex AI with your own key. AI insights can be inaccurate.",fontSize=14.sp)
         for((label,url) in listOf("Google Privacy Policy" to "https://policies.google.com/privacy",
             "YouTube Terms of Service" to "https://www.youtube.com/t/terms",
             "Manage Google connections" to "https://myaccount.google.com/connections"))

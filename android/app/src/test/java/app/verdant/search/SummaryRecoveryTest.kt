@@ -204,4 +204,40 @@ class SummaryRecoveryTest {
             catch(e:SearchFailure){assertEquals("summary_timeout",e.code)}
         }
     }
+    @Test fun vertexSummariesUseTheProjectEndpointAndTheVideoMediaType()=runBlocking {
+        MockWebServer().use {server->
+            server.enqueue(MockResponse().setBody(success))
+            val repo=SummaryRepository(OkHttpClient(),server.url("/v1beta").toString(),{},{0},server.url("/v1").toString())
+            assertEquals("An insight.",repo.summarize(video,"vertex-key","gemini-4-hydrogen",vertexProject="my-project-123"))
+            val request=server.takeRequest()
+            assertEquals("/v1/projects/my-project-123/locations/global/publishers/google/models/gemini-4-hydrogen:generateContent",request.path)
+            assertEquals("vertex-key",request.getHeader("X-Goog-Api-Key"))
+            val part=JSONObject(request.body.readUtf8()).getJSONArray("contents").getJSONObject(0).getJSONArray("parts").getJSONObject(0).getJSONObject("fileData")
+            assertEquals("video/mp4",part.getString("mimeType"))
+        }
+        assertFalse(summaryRequest(video).toString().contains("mimeType"))
+        for(bad in listOf("","UPPER-case","ab","project/../x","has space"))assertFalse(bad,validVertexProject(bad))
+        assertTrue(validVertexProject("example-project-123456"))
+    }
+    @Test fun busyVertexModelFallsBackToTheGeminiApiWithTheGeminiKey()=runBlocking {
+        MockWebServer().use {server->
+            repeat(2){server.enqueue(MockResponse().setResponseCode(503))}
+            server.enqueue(MockResponse().setBody(success))
+            val repo=SummaryRepository(OkHttpClient(),server.url("/v1beta").toString(),{},{0},server.url("/v1").toString())
+            val (_,used)=summarizeWithFallback(repo,video,"vertex-key","gemini-4-hydrogen","gemini-flash-lite-latest",vertexProject="my-project-123",backupKey="gemini-key")
+            assertEquals("gemini-flash-lite-latest",used)
+            val requests=List(3){server.takeRequest()}
+            assertTrue(requests.take(2).all {it.path!!.startsWith("/v1/projects/my-project-123/") && it.getHeader("X-Goog-Api-Key")=="vertex-key"})
+            assertEquals("/v1beta/models/gemini-flash-lite-latest:generateContent",requests[2].path)
+            assertEquals("gemini-key",requests[2].getHeader("X-Goog-Api-Key"))
+        }
+        // Without a Gemini key there is no backup, and the Vertex model keeps all three attempts.
+        MockWebServer().use {server->
+            repeat(3){server.enqueue(MockResponse().setResponseCode(503))}
+            val repo=SummaryRepository(OkHttpClient(),server.url("/v1beta").toString(),{},{0},server.url("/v1").toString())
+            try {summarizeWithFallback(repo,video,"vertex-key","gemini-4-hydrogen","gemini-flash-lite-latest",vertexProject="my-project-123",backupKey="");fail("Expected failure")}
+            catch(e:SearchFailure){assertEquals("summary_http_503",e.code)}
+            assertEquals(3,server.requestCount)
+        }
+    }
 }

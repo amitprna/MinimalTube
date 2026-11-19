@@ -85,4 +85,12 @@ class WatchProgressTest {
         // Videos already in the history keep their position up to date.
         assertTrue(shouldTrackWatch(WatchEntry(400,600,1),2,402,600))
     }
+    @Test fun ignoredVideosAreStoredCompactlyAndKeepTheNewest() {
+        val ids=(1..1200).map {"vid%08d".format(it)}
+        val kept=parseIgnored(encodeIgnored(ids))
+        assertEquals(MAX_IGNORED_VIDEOS,kept.size)
+        assertTrue("vid00001200" in kept);assertFalse("vid00000001" in kept)
+        assertEquals(setOf("HlPe33BYvE4"),parseIgnored("HlPe33BYvE4,not-a-video-id,,bad'id"))
+        assertTrue(parseIgnored(null).isEmpty())
+    }
 }

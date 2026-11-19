@@ -17,6 +17,12 @@ const val MIN_RESUME_SECONDS = 5
 const val MIN_TRACK_SECONDS = 120
 const val RESUME_REWIND_SECONDS = 2
 const val MAX_WATCH_ENTRIES = 1000
+const val MAX_IGNORED_VIDEOS = 1000
+private const val IGNORED_KEY = "ignored-videos"
+/** Parses the stored list of videos whose history is not tracked, keeping the newest. */
+fun parseIgnored(value: String?): LinkedHashSet<String> =
+    value.orEmpty().split(',').filter(::validVideoId).toCollection(LinkedHashSet())
+fun encodeIgnored(ids: Collection<String>, max: Int = MAX_IGNORED_VIDEOS) = ids.toList().takeLast(max).joinToString(",")
 
 /** Videos already in the history keep updating; new ones need two minutes of playback or to be played to the end. */
 fun shouldTrackWatch(existing: WatchEntry?, playedSeconds: Int, position: Int, duration: Int): Boolean =
@@ -59,6 +65,7 @@ object WatchHistory {
     private var prefs: SharedPreferences? = null
     private val loaded = CompletableDeferred<Unit>()
     private val entries = MutableStateFlow<Map<String,WatchEntry>>(emptyMap())
+    @Volatile private var ignored: Set<String> = emptySet()
     val state = entries.asStateFlow()
 
     /** Reads stored positions; call off the main thread. */
@@ -66,7 +73,8 @@ object WatchHistory {
         if(prefs!=null)return
         val sp=context.applicationContext.getSharedPreferences("greentube-watch",0)
         prefs=sp
-        val all=sp.all.mapNotNull {(id,value)->if(validVideoId(id))parseWatchEntry(value as? String)?.let {id to it} else null}.toMap()
+        ignored=parseIgnored(sp.getString(IGNORED_KEY,null))+ignored
+        val all=sp.all.mapNotNull {(id,value)->if(validVideoId(id) && id !in ignored)parseWatchEntry(value as? String)?.let {id to it} else null}.toMap()
         val kept=pruneWatchHistory(all)
         if(kept.size<all.size)sp.edit().apply {(all.keys-kept.keys).forEach(::remove)}.apply()
         entries.value=kept+entries.value
@@ -77,8 +85,9 @@ object WatchHistory {
         if(loaded.isCompleted)return null
         return parseWatchEntry(context.applicationContext.getSharedPreferences("greentube-watch",0).getString(videoId,null))
     }
+    fun isIgnored(videoId: String) = videoId in ignored
     fun record(context: Context, videoId: String, position: Int, duration: Int, now: Long = System.currentTimeMillis()) {
-        if(!validVideoId(videoId) || position<0 || duration<0)return
+        if(!validVideoId(videoId) || position<0 || duration<0 || videoId in ignored)return
         val entry=WatchEntry(position,duration,now)
         entries.value=entries.value+(videoId to entry)
         val sp=prefs ?: context.applicationContext.getSharedPreferences("greentube-watch",0)
@@ -100,7 +109,27 @@ object WatchHistory {
         val sp=checkNotNull(prefs)
         sp.edit().apply {newer.forEach {(id,entry)->if(id in entries.value)putString(id,encodeWatchEntry(entry))}}.apply()
     }
+    /** Removes a video's saved position and stops tracking it; [restore] undoes this. */
+    fun forget(context: Context, videoId: String): WatchEntry? {
+        if(!validVideoId(videoId))return null
+        val previous=entries.value[videoId]
+        ignored=(ignored-videoId)+videoId
+        entries.value=entries.value-videoId
+        val sp=prefs ?: context.applicationContext.getSharedPreferences("greentube-watch",0)
+        sp.edit().remove(videoId).putString(IGNORED_KEY,encodeIgnored(ignored)).apply()
+        return previous
+    }
+    fun restore(context: Context, videoId: String, entry: WatchEntry?) {
+        ignored=ignored-videoId
+        val sp=prefs ?: context.applicationContext.getSharedPreferences("greentube-watch",0)
+        sp.edit().putString(IGNORED_KEY,encodeIgnored(ignored)).apply()
+        if(entry!=null) {
+            entries.value=entries.value+(videoId to entry)
+            sp.edit().putString(videoId,encodeWatchEntry(entry)).apply()
+        }
+    }
     fun clear(context: Context) {
+        ignored=emptySet()
         entries.value=emptyMap()
         (prefs ?: context.applicationContext.getSharedPreferences("greentube-watch",0)).edit().clear().apply()
     }

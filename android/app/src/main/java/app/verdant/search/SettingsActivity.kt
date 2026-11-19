@@ -150,6 +150,7 @@ private data class KeyGuide(val id:String,val title:String,val steps:String,val 
 private val guides=listOf(
     KeyGuide("youtube","YouTube API key","1. Open Google Cloud Console and create a project.\n2. Enable YouTube Data API v3 in APIs & Services → Library.\n3. Open Credentials → Create credentials → API key.\n4. Restrict the key to YouTube Data API v3; configure supported application restrictions.\n5. Paste the key here. Quota belongs to this project even when you sign in.","https://console.cloud.google.com/apis/library/youtube.googleapis.com"),
     KeyGuide("gemini","Gemini API key","1. Open Google AI Studio.\n2. Select Get API key and create a key in your own project.\n3. Configure quota/billing as needed.\n4. Restrict the key to the Generative Language API.\n5. Paste it here. Only Get summary sends a public video URL to Gemini. Private and unlisted videos are unsupported.","https://aistudio.google.com/apikey"),
+    KeyGuide("vertex","Vertex AI API key","Only needed if summaries use Vertex AI, which bills your Google Cloud project and can use its credits.\n1. In Google Cloud Console, open the project that has billing or credits.\n2. Enable the Vertex AI API.\n3. Open APIs & Services → Credentials → Create credentials → API key, and bind it to a service account with the Vertex AI User role.\n4. Restrict the key to the Vertex AI API.\n5. Paste it here, and enter the project ID under Summaries below.","https://console.cloud.google.com/apis/credentials"),
 )
 @Composable private fun KeySettings() {
     val context=androidx.compose.ui.platform.LocalContext.current
@@ -163,10 +164,31 @@ private val guides=listOf(
 
 
     Text("Keys are encrypted on this device and excluded from backups.",fontSize=12.sp,color=Muted)
-    ModelPicker("Summary model","gemini-model",remember(revision){AppSettings.model()},allowOff=false,
-        note="Flash gives the most detailed summaries. Flash-Lite is faster and lighter. Both follow Google's newest release.")
-    ModelPicker("Backup model","gemini-fallback-model",remember(revision){AppSettings.fallbackModel()},allowOff=true,
-        note="Used once when the summary model is busy or too slow. The summary shows which model wrote it.")
+    val service=remember(revision){AppSettings.summaryService()}
+    Text("Summaries",color=Muted,fontSize=13.sp)
+    SettingsBlock {listOf(SERVICE_GEMINI to "Gemini API · free tier or AI Studio billing",SERVICE_VERTEX to "Vertex AI · Google Cloud billing and credits").forEach {(id,label)->
+        Row(Modifier.fillMaxWidth().clickable {AppSettings.setText("summary-service",id)}.padding(12.dp),verticalAlignment=Alignment.CenterVertically) {
+            RadioButton(service==id,{AppSettings.setText("summary-service",id)});Text(label,fontSize=14.sp)
+        }
+    }}
+    if(service==SERVICE_VERTEX) {
+        var project by remember(revision){mutableStateOf(AppSettings.vertexProject())}
+        SettingsBlock {Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            Text("Google Cloud project")
+            OutlinedTextField(project,{project=it.trim().lowercase()},singleLine=true,label={Text("Project ID, for example my-project-123456")},modifier=Modifier.fillMaxWidth())
+            TextButton(enabled=validVertexProject(project) && project!=AppSettings.vertexProject(),onClick={AppSettings.setText("vertex-project",project)}){Text(if(project==AppSettings.vertexProject() && project.isNotBlank())"Saved" else "Save")}
+            Text("Uses the Vertex AI API key above. Summaries are billed to this project.",fontSize=12.sp,color=Muted)
+        }}
+        ModelPicker("Summary model","vertex-model",remember(revision){AppSettings.vertexModel()},allowOff=false,presets=vertexPresetModels,
+            note="Vertex AI needs a named model; it does not accept the -latest names. A 15-minute video costs about ₹13 with Gemini 4 Hydrogen (November 2026 prices).")
+        ModelPicker("Backup model","gemini-fallback-model",remember(revision){AppSettings.fallbackModel()},allowOff=true,
+            note="Used once when the Vertex model is busy or too slow. It runs on the Gemini API with your Gemini key; without one, there is no backup.")
+    } else {
+        ModelPicker("Summary model","gemini-model",remember(revision){AppSettings.model()},allowOff=false,
+            note="Flash gives the most detailed summaries. Flash-Lite is faster and lighter. Both follow Google's newest release.")
+        ModelPicker("Backup model","gemini-fallback-model",remember(revision){AppSettings.fallbackModel()},allowOff=true,
+            note="Used once when the summary model is busy or too slow. The summary shows which model wrote it.")
+    }
     error?.let {Text(it,color=MaterialTheme.colorScheme.error)
         if(it.startsWith("Could not unlock"))TextButton(onClick={AppSettings.resetKeys();error=null}){Text("Reset inaccessible keys")}
     }
@@ -282,23 +304,24 @@ private fun enabledLinkHosts(context:android.content.Context):Set<String>? {
 
 /** The two aliases always point at Google's newest release, so nobody has to know version names. */
 internal val presetModels=listOf("gemini-flash-latest" to "Gemini Flash Latest","gemini-flash-lite-latest" to "Gemini Flash-Lite Latest")
-internal fun modelChoiceLabel(model:String,allowOff:Boolean):String=
-    presetModels.firstOrNull {it.first==model}?.second ?: if(model.isBlank() && allowOff)"Off" else "Custom"
+internal val vertexPresetModels=listOf(DEFAULT_VERTEX_MODEL to "Gemini 4 Hydrogen")
+internal fun modelChoiceLabel(model:String,allowOff:Boolean,presets:List<Pair<String,String>> = presetModels):String=
+    presets.firstOrNull {it.first==model}?.second ?: if(model.isBlank() && allowOff)"Off" else "Custom"
 
-@Composable private fun ModelPicker(title:String,setting:String,saved:String,allowOff:Boolean,note:String) {
+@Composable private fun ModelPicker(title:String,setting:String,saved:String,allowOff:Boolean,note:String,presets:List<Pair<String,String>> = presetModels) {
     var open by remember {mutableStateOf(false)}
-    var custom by remember(saved){mutableStateOf(modelChoiceLabel(saved,allowOff)=="Custom")}
-    var name by remember(saved){mutableStateOf(if(presetModels.any {it.first==saved})"" else saved)}
+    var custom by remember(saved){mutableStateOf(modelChoiceLabel(saved,allowOff,presets)=="Custom")}
+    var name by remember(saved){mutableStateOf(if(presets.any {it.first==saved})"" else saved)}
     fun choose(model:String){custom=false;open=false;AppSettings.setText(setting,model)}
     SettingsBlock {Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         Text(title)
         Box {
             OutlinedButton(onClick={open=true},shape=RoundedCornerShape(14.dp),modifier=Modifier.fillMaxWidth()) {
-                Text(if(custom)"Custom" else modelChoiceLabel(saved,allowOff),Modifier.weight(1f))
+                Text(if(custom)"Custom" else modelChoiceLabel(saved,allowOff,presets),Modifier.weight(1f))
                 Icon(Icons.Outlined.ArrowDropDown,"Choose "+title.lowercase())
             }
             DropdownMenu(open,{open=false}) {
-                presetModels.forEach {(id,label)->DropdownMenuItem(text={Text(label)},onClick={choose(id)})}
+                presets.forEach {(id,label)->DropdownMenuItem(text={Text(label)},onClick={choose(id)})}
                 if(allowOff)DropdownMenuItem(text={Text("Off")},onClick={choose("")})
                 DropdownMenuItem(text={Text("Custom")},onClick={custom=true;open=false})
             }

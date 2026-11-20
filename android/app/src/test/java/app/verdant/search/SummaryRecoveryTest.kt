@@ -240,4 +240,19 @@ class SummaryRecoveryTest {
             assertEquals(3,server.requestCount)
         }
     }
+    @Test fun requestsUseFewerFramesAtLowResolution() {
+        val request=summaryRequest(video)
+        val part=request.getJSONArray("contents").getJSONObject(0).getJSONArray("parts").getJSONObject(0)
+        assertEquals(0.2,part.getJSONObject("videoMetadata").getDouble("fps"),0.0001)
+        assertEquals("MEDIA_RESOLUTION_LOW",request.getJSONObject("generationConfig").getString("mediaResolution"))
+        assertEquals("HIGH",request.getJSONObject("generationConfig").getJSONObject("thinkingConfig").getString("thinkingLevel"))
+    }
+    @Test fun anAnswerWrittenWithoutTheVideoIsAFailureNotASummary() {
+        val textOnly=JSONObject("""{"candidates":[{"content":{"parts":[{"text":"I cannot access or view the video."}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokensDetails":[{"modality":"TEXT","tokenCount":160}]}}""")
+        val error=assertThrows(SearchFailure::class.java){summaryText(textOnly)}
+        assertEquals("summary_no_video",error.code);assertTrue(summaryModelUnavailable(error))
+        val withVideo=JSONObject("""{"candidates":[{"content":{"parts":[{"text":"An insight."}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokensDetails":[{"modality":"TEXT","tokenCount":2270},{"modality":"VIDEO","tokenCount":38861}]}}""")
+        assertEquals("An insight.",summaryText(withVideo))
+        assertEquals("An insight.",summaryText(JSONObject(success)))
+    }
 }

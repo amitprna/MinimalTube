@@ -22,8 +22,8 @@ android {
         applicationId = "app.verdant.search"
         minSdk = 26
         targetSdk = 36
-        versionCode = 29
-        versionName = "1.1"
+        versionCode = 30
+        versionName = "1.2"
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -8,7 +8,7 @@ MinimalTube sends the public YouTube URL and this exact prompt as one user messa
 
 Summaries display as native formatted Markdown, including bullets, bold text and headings. Tap a timestamp such as **12:34** or **1:02:03** to seek within the current player. Timed YouTube links in a summary also seek in-app. A paused video stays paused. Gemini chooses the number of insights based on the video.
 
-There is no separate system prompt. The request uses `thinkingLevel: HIGH` and `maxOutputTokens: 32768`; other sampling settings use Google's defaults. No web-search tools, caption scraping or video downloads are used. Internal thought parts are excluded from the displayed response. This is an AI summary, not an independent fact-check.
+There is no separate system prompt. The request uses `thinkingLevel: HIGH`, `maxOutputTokens: 32768`, low media resolution and one video frame every five seconds; speech and captions carry the summary, and this lets videos of two hours fit. Other sampling settings use Google's defaults. No web-search tools, caption scraping or video downloads are used. Internal thought parts are excluded from the displayed response. This is an AI summary, not an independent fact-check.
 
 ## If a summary fails
 
